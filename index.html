@@ -2,272 +2,181 @@
 <html lang="pt-br">
 <head>
 <meta charset="UTF-8">
-<title>Dashboard Kanban PRO</title>
+<title>Dashboard Pro</title>
 
-<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
 body {
-  font-family: "Segoe UI", sans-serif;
+  font-family: Arial;
   margin: 0;
-  background: #eef1f4;
+  background: #eef2f5;
+}
+
+.topbar {
+  padding: 10px;
+  background: #2f6f73;
+  color: white;
+  display: flex;
+  justify-content: space-between;
 }
 
 .board {
   display: flex;
-  gap: 15px;
-  padding: 20px;
+  overflow-x: auto;
+  padding: 10px;
+  gap: 10px;
 }
 
 .column {
-  background: #f9fbfc;
-  border-radius: 8px;
-  width: 20%;
-  border: 1px solid #dfe3e8;
-  display: flex;
-  flex-direction: column;
+  min-width: 250px;
+  background: white;
+  border-radius: 6px;
+  padding: 8px;
 }
 
 .header {
-  background: #2f6f73;
-  color: white;
-  padding: 12px;
   font-weight: bold;
-  border-radius: 8px 8px 0 0;
-  font-size: 14px;
-}
-
-.tasks {
-  padding: 10px;
-  min-height: 300px;
+  margin-bottom: 8px;
 }
 
 .card {
-  background: white;
-  border: 1px solid #dfe3e8;
-  border-radius: 6px;
-  padding: 10px;
-  margin-bottom: 10px;
-  font-size: 13px;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-}
-
-.card-title {
-  font-weight: 600;
-  margin-bottom: 6px;
-}
-
-.meta {
+  padding: 8px;
+  margin-bottom: 8px;
+  border-radius: 5px;
   font-size: 12px;
-  color: #6b778c;
 }
 
-.badge {
-  display: inline-block;
-  margin-top: 6px;
-  padding: 3px 6px;
-  border-radius: 4px;
+.alta { border-left: 5px solid red; }
+.media { border-left: 5px solid orange; }
+.baixa { border-left: 5px solid green; }
+
+button {
   font-size: 11px;
-}
-
-.previsto {
-  background: #e3f2fd;
-  color: #1976d2;
-}
-
-.actions {
-  margin-top: 8px;
-  display: flex;
-  gap: 5px;
-}
-
-.actions button {
-  border: none;
-  font-size: 11px;
-  padding: 3px 6px;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.edit { background: #ffc107; }
-.delete { background: #f44336; color: white; }
-.done { background: #4caf50; color: white; }
-
-.footer {
-  padding: 10px;
-  border-top: 1px dashed #ccc;
-  text-align: center;
-}
-
-.add-btn {
-  background: transparent;
-  border: 1px dashed #ff8c42;
-  color: #ff8c42;
-  padding: 6px;
-  border-radius: 6px;
-  cursor: pointer;
+  margin-top: 5px;
 }
 </style>
 </head>
 
 <body>
 
+<div class="topbar">
+  <div>📊 Meu Dashboard</div>
+  <button onclick="addTask()">+ Tarefa</button>
+</div>
+
+<div id="alerta"></div>
+
 <div class="board" id="board"></div>
 
 <script>
-const dias = ["Segunda","Terça","Quarta","Quinta","Sexta"];
-
-function criarBoard() {
-  const board = document.getElementById("board");
-
-  dias.forEach(dia => {
-    const id = dia.toLowerCase();
-
-    const col = document.createElement("div");
-    col.className = "column";
-
-    col.innerHTML = `
-      <div class="header">${dia}</div>
-      <div class="tasks" id="${id}"></div>
-      <div class="footer">
-        <button class="add-btn" onclick="addTask('${id}')">+ Adicionar tarefa</button>
-      </div>
-    `;
-
-    board.appendChild(col);
-  });
-}
-
 function getData() {
-  let data = JSON.parse(localStorage.getItem("kanban"));
-  if (!data) {
-    data = {};
-    dias.forEach(d => data[d.toLowerCase()] = []);
-  }
-  return data;
+  return JSON.parse(localStorage.getItem("tasks") || "[]");
 }
 
 function salvar(data) {
-  localStorage.setItem("kanban", JSON.stringify(data));
+  localStorage.setItem("tasks", JSON.stringify(data));
 }
 
-function addTask(coluna) {
-  const titulo = prompt("Título:");
-  if (!titulo) return;
+function addTask() {
+  const titulo = prompt("Tarefa:");
+  const prazo = prompt("Data (YYYY-MM-DD):");
+  const prioridade = prompt("Prioridade: alta, media, baixa");
 
-  const responsavel = prompt("Responsável:");
-  const prazo = prompt("Prazo:");
+  if (!titulo || !prazo) return;
 
   const data = getData();
 
-  data[coluna].push({
+  data.push({
     id: Date.now(),
     titulo,
-    responsavel,
     prazo,
-    status: "Previsto"
+    prioridade,
+    status: "ativo"
   });
 
   salvar(data);
   render();
+}
+
+function getCategoria(prazo) {
+  const hoje = new Date().toISOString().slice(0,10);
+
+  if (prazo < hoje) return "atrasado";
+  if (prazo === hoje) return "hoje";
+
+  const amanha = new Date();
+  amanha.setDate(amanha.getDate() + 1);
+  const amanhaStr = amanha.toISOString().slice(0,10);
+
+  if (prazo === amanhaStr) return "amanha";
+
+  return "futuro";
 }
 
 function render() {
   const data = getData();
 
-  Object.keys(data).forEach(coluna => {
-    const el = document.getElementById(coluna);
-    el.innerHTML = "";
+  let atrasado = [], hoje = [], amanha = [], concluido = [];
 
-    data[coluna].forEach(task => {
-      const card = document.createElement("div");
-      card.className = "card";
-      card.dataset.id = task.id;
-
-      card.innerHTML = `
-        <div class="card-title">${task.titulo}</div>
-        <div class="meta">👤 ${task.responsavel || "-"}</div>
-        <div class="meta">📅 ${task.prazo || "-"}</div>
-        <div class="badge previsto">${task.status}</div>
-
-        <div class="actions">
-          <button class="done" onclick="concluir(${task.id})">✔</button>
-          <button class="edit" onclick="editar(${task.id})">✏️</button>
-          <button class="delete" onclick="remover(${task.id})">❌</button>
-        </div>
-      `;
-
-      el.appendChild(card);
-    });
+  data.forEach(t => {
+    if (t.status === "concluido") {
+      concluido.push(t);
+    } else {
+      const cat = getCategoria(t.prazo);
+      if (cat === "atrasado") atrasado.push(t);
+      if (cat === "hoje") hoje.push(t);
+      if (cat === "amanha") amanha.push(t);
+    }
   });
 
-  initDrag();
+  document.getElementById("alerta").innerHTML =
+    atrasado.length > 0
+    ? `<div style="background:red;color:white;padding:8px">
+        ⚠️ Você tem ${atrasado.length} tarefas atrasadas
+      </div>`
+    : "";
+
+  document.getElementById("board").innerHTML = `
+    ${coluna("🔴 Atrasado", atrasado)}
+    ${coluna("🟡 Hoje", hoje)}
+    ${coluna("🔵 Amanhã", amanha)}
+    ${coluna("🟢 Concluído", concluido)}
+  `;
+}
+
+function coluna(nome, lista) {
+  return `
+    <div class="column">
+      <div class="header">${nome}</div>
+      ${lista.map(t => `
+        <div class="card ${t.prioridade}">
+          <b>${t.titulo}</b><br>
+          ${t.prazo}<br>
+          ⭐ ${t.prioridade}<br>
+          <button onclick="concluir(${t.id})">✔</button>
+          <button onclick="remover(${t.id})">❌</button>
+        </div>
+      `).join("")}
+    </div>
+  `;
 }
 
 function concluir(id) {
   const data = getData();
-  Object.values(data).forEach(lista => {
-    lista.forEach(t => {
-      if (t.id === id) t.status = "Concluído";
-    });
-  });
-  salvar(data);
-  render();
-}
-
-function editar(id) {
-  const data = getData();
-  Object.values(data).forEach(lista => {
-    lista.forEach(t => {
-      if (t.id === id) {
-        t.titulo = prompt("Título:", t.titulo);
-        t.responsavel = prompt("Responsável:", t.responsavel);
-        t.prazo = prompt("Prazo:", t.prazo);
-      }
-    });
+  data.forEach(t => {
+    if (t.id === id) t.status = "concluido";
   });
   salvar(data);
   render();
 }
 
 function remover(id) {
-  let data = getData();
-  Object.keys(data).forEach(k => {
-    data[k] = data[k].filter(t => t.id !== id);
-  });
+  let data = getData().filter(t => t.id !== id);
   salvar(data);
   render();
 }
 
-function initDrag() {
-  Object.keys(getData()).forEach(coluna => {
-    new Sortable(document.getElementById(coluna), {
-      group: "tasks",
-      animation: 150,
-      onEnd: salvarOrdem
-    });
-  });
-}
-
-function salvarOrdem() {
-  let novo = {};
-  Object.keys(getData()).forEach(coluna => {
-    const el = document.getElementById(coluna);
-    novo[coluna] = [];
-
-    [...el.children].forEach(card => {
-      const id = Number(card.dataset.id);
-      Object.values(getData()).forEach(lista => {
-        const found = lista.find(t => t.id === id);
-        if (found) novo[coluna].push(found);
-      });
-    });
-  });
-
-  salvar(novo);
-}
-
-criarBoard();
 render();
 </script>
 
