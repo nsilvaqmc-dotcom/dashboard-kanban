@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<title>Dashboard PRO</title>
+
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+
+<style>
+body {
+  font-family: "Segoe UI", sans-serif;
+  margin: 0;
+  background: #f4f6f8;
+}
+
+.board {
+  display: flex;
+  gap: 15px;
+  padding: 20px;
+}
+
+.column {
+  background: #fff;
+  border-radius: 8px;
+  width: 20%;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #ddd;
+}
+
+.header {
+  background: #2f6f73;
+  color: white;
+  padding: 10px;
+  text-align: center;
+  font-weight: bold;
+}
+
+.tasks {
+  padding: 10px;
+  min-height: 200px;
+}
+
+.card {
+  background: #f8fafc;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 10px;
+  margin-bottom: 10px;
+  cursor: grab;
+}
+
+.card:hover {
+  background: #eef3f7;
+}
+
+.card-title {
+  font-weight: bold;
+}
+
+.meta {
+  font-size: 12px;
+  color: #555;
+}
+
+.badge {
+  margin-top: 5px;
+  display: inline-block;
+  padding: 3px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  background: #e3f2fd;
+  color: #1976d2;
+}
+
+.footer {
+  padding: 10px;
+  border-top: 1px dashed #ddd;
+  text-align: center;
+}
+
+button {
+  background: #ff8c42;
+  border: none;
+  color: white;
+  padding: 6px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.actions {
+  margin-top: 5px;
+  display: flex;
+  gap: 5px;
+}
+
+.small-btn {
+  font-size: 11px;
+  padding: 3px 5px;
+  background: #ccc;
+  color: #000;
+}
+</style>
+</head>
+
+<body>
+
+<div class="board" id="board"></div>
+
+<script>
+const dias = ["segunda", "terca", "quarta", "quinta", "sexta"];
+
+function criarBoard() {
+  const board = document.getElementById("board");
+
+  dias.forEach(dia => {
+    const col = document.createElement("div");
+    col.className = "column";
+
+    col.innerHTML = `
+      <div class="header">${dia.toUpperCase()}</div>
+      <div class="tasks" id="${dia}"></div>
+      <div class="footer">
+        <button onclick="addTask('${dia}')">+ Adicionar</button>
+      </div>
+    `;
+
+    board.appendChild(col);
+  });
+}
+
+function addTask(coluna) {
+  const titulo = prompt("Título:");
+  if (!titulo) return;
+
+  const responsavel = prompt("Responsável:");
+  const prazo = prompt("Prazo:");
+
+  const task = {
+    id: Date.now(),
+    titulo,
+    responsavel,
+    prazo,
+    status: "Previsto"
+  };
+
+  salvarTask(coluna, task);
+  render();
+}
+
+function salvarTask(coluna, task) {
+  const data = getData();
+  data[coluna].push(task);
+  localStorage.setItem("kanban", JSON.stringify(data));
+}
+
+function getData() {
+  let data = JSON.parse(localStorage.getItem("kanban"));
+
+  if (!data) {
+    data = {};
+    dias.forEach(d => data[d] = []);
+  }
+
+  return data;
+}
+
+function render() {
+  const data = getData();
+
+  dias.forEach(dia => {
+    const el = document.getElementById(dia);
+    el.innerHTML = "";
+
+    data[dia].forEach(task => {
+      const card = document.createElement("div");
+      card.className = "card";
+      card.dataset.id = task.id;
+
+      card.innerHTML = `
+        <div class="card-title">${task.titulo}</div>
+        <div class="meta">👤 ${task.responsavel || "-"}</div>
+        <div class="meta">📅 ${task.prazo || "-"}</div>
+        <div class="badge">${task.status}</div>
+
+        <div class="actions">
+          <button class="small-btn" onclick="editar(${task.id})">Editar</button>
+          <button class="small-btn" onclick="remover(${task.id})">Excluir</button>
+        </div>
+      `;
+
+      el.appendChild(card);
+    });
+  });
+
+  initDrag();
+}
+
+function editar(id) {
+  const data = getData();
+
+  for (let dia of dias) {
+    const task = data[dia].find(t => t.id === id);
+    if (task) {
+      task.titulo = prompt("Novo título:", task.titulo);
+      task.responsavel = prompt("Responsável:", task.responsavel);
+      task.prazo = prompt("Prazo:", task.prazo);
+    }
+  }
+
+  localStorage.setItem("kanban", JSON.stringify(data));
+  render();
+}
+
+function remover(id) {
+  let data = getData();
+
+  dias.forEach(dia => {
+    data[dia] = data[dia].filter(t => t.id !== id);
+  });
+
+  localStorage.setItem("kanban", JSON.stringify(data));
+  render();
+}
+
+function initDrag() {
+  dias.forEach(dia => {
+    new Sortable(document.getElementById(dia), {
+      group: "tasks",
+      animation: 150,
+      onEnd: salvarOrdem
+    });
+  });
+}
+
+function salvarOrdem() {
+  let novo = {};
+
+  dias.forEach(dia => {
+    const col = document.getElementById(dia);
+    novo[dia] = [];
+
+    [...col.children].forEach(card => {
+      const id = Number(card.dataset.id);
+
+      dias.forEach(d => {
+        const original = getData()[d].find(t => t.id === id);
+        if (original) novo[dia].push(original);
+      });
+    });
+  });
+
+  localStorage.setItem("kanban", JSON.stringify(novo));
+}
+
+criarBoard();
+render();
+</script>
+
+</body>
+</html>
