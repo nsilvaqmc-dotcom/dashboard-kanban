@@ -2,7 +2,7 @@
 <html lang="pt-br">
 <head>
 <meta charset="UTF-8">
-<title>Dashboard PRO</title>
+<title>Dashboard Kanban PRO</title>
 
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 
@@ -10,7 +10,7 @@
 body {
   font-family: "Segoe UI", sans-serif;
   margin: 0;
-  background: #f4f6f8;
+  background: #eef1f4;
 }
 
 .board {
@@ -20,85 +20,92 @@ body {
 }
 
 .column {
-  background: #fff;
+  background: #f9fbfc;
   border-radius: 8px;
   width: 20%;
+  border: 1px solid #dfe3e8;
   display: flex;
   flex-direction: column;
-  border: 1px solid #ddd;
 }
 
 .header {
   background: #2f6f73;
   color: white;
-  padding: 10px;
-  text-align: center;
+  padding: 12px;
   font-weight: bold;
+  border-radius: 8px 8px 0 0;
+  font-size: 14px;
 }
 
 .tasks {
   padding: 10px;
-  min-height: 200px;
+  min-height: 300px;
 }
 
 .card {
-  background: #f8fafc;
-  border: 1px solid #ddd;
+  background: white;
+  border: 1px solid #dfe3e8;
   border-radius: 6px;
   padding: 10px;
   margin-bottom: 10px;
-  cursor: grab;
-}
-
-.card:hover {
-  background: #eef3f7;
+  font-size: 13px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
 }
 
 .card-title {
-  font-weight: bold;
+  font-weight: 600;
+  margin-bottom: 6px;
 }
 
 .meta {
   font-size: 12px;
-  color: #555;
+  color: #6b778c;
 }
 
 .badge {
-  margin-top: 5px;
   display: inline-block;
+  margin-top: 6px;
   padding: 3px 6px;
   border-radius: 4px;
   font-size: 11px;
+}
+
+.previsto {
   background: #e3f2fd;
   color: #1976d2;
 }
 
-.footer {
-  padding: 10px;
-  border-top: 1px dashed #ddd;
-  text-align: center;
-}
-
-button {
-  background: #ff8c42;
-  border: none;
-  color: white;
-  padding: 6px;
-  border-radius: 5px;
-  cursor: pointer;
-}
-
 .actions {
-  margin-top: 5px;
+  margin-top: 8px;
   display: flex;
   gap: 5px;
 }
 
-.small-btn {
+.actions button {
+  border: none;
   font-size: 11px;
-  padding: 3px 5px;
-  background: #ccc;
-  color: #000;
+  padding: 3px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.edit { background: #ffc107; }
+.delete { background: #f44336; color: white; }
+.done { background: #4caf50; color: white; }
+
+.footer {
+  padding: 10px;
+  border-top: 1px dashed #ccc;
+  text-align: center;
+}
+
+.add-btn {
+  background: transparent;
+  border: 1px dashed #ff8c42;
+  color: #ff8c42;
+  padding: 6px;
+  border-radius: 6px;
+  cursor: pointer;
 }
 </style>
 </head>
@@ -108,25 +115,40 @@ button {
 <div class="board" id="board"></div>
 
 <script>
-const dias = ["segunda", "terca", "quarta", "quinta", "sexta"];
+const dias = ["Segunda","Terça","Quarta","Quinta","Sexta"];
 
 function criarBoard() {
   const board = document.getElementById("board");
 
   dias.forEach(dia => {
+    const id = dia.toLowerCase();
+
     const col = document.createElement("div");
     col.className = "column";
 
     col.innerHTML = `
-      <div class="header">${dia.toUpperCase()}</div>
-      <div class="tasks" id="${dia}"></div>
+      <div class="header">${dia}</div>
+      <div class="tasks" id="${id}"></div>
       <div class="footer">
-        <button onclick="addTask('${dia}')">+ Adicionar</button>
+        <button class="add-btn" onclick="addTask('${id}')">+ Adicionar tarefa</button>
       </div>
     `;
 
     board.appendChild(col);
   });
+}
+
+function getData() {
+  let data = JSON.parse(localStorage.getItem("kanban"));
+  if (!data) {
+    data = {};
+    dias.forEach(d => data[d.toLowerCase()] = []);
+  }
+  return data;
+}
+
+function salvar(data) {
+  localStorage.setItem("kanban", JSON.stringify(data));
 }
 
 function addTask(coluna) {
@@ -136,43 +158,28 @@ function addTask(coluna) {
   const responsavel = prompt("Responsável:");
   const prazo = prompt("Prazo:");
 
-  const task = {
+  const data = getData();
+
+  data[coluna].push({
     id: Date.now(),
     titulo,
     responsavel,
     prazo,
     status: "Previsto"
-  };
+  });
 
-  salvarTask(coluna, task);
+  salvar(data);
   render();
-}
-
-function salvarTask(coluna, task) {
-  const data = getData();
-  data[coluna].push(task);
-  localStorage.setItem("kanban", JSON.stringify(data));
-}
-
-function getData() {
-  let data = JSON.parse(localStorage.getItem("kanban"));
-
-  if (!data) {
-    data = {};
-    dias.forEach(d => data[d] = []);
-  }
-
-  return data;
 }
 
 function render() {
   const data = getData();
 
-  dias.forEach(dia => {
-    const el = document.getElementById(dia);
+  Object.keys(data).forEach(coluna => {
+    const el = document.getElementById(coluna);
     el.innerHTML = "";
 
-    data[dia].forEach(task => {
+    data[coluna].forEach(task => {
       const card = document.createElement("div");
       card.className = "card";
       card.dataset.id = task.id;
@@ -181,11 +188,12 @@ function render() {
         <div class="card-title">${task.titulo}</div>
         <div class="meta">👤 ${task.responsavel || "-"}</div>
         <div class="meta">📅 ${task.prazo || "-"}</div>
-        <div class="badge">${task.status}</div>
+        <div class="badge previsto">${task.status}</div>
 
         <div class="actions">
-          <button class="small-btn" onclick="editar(${task.id})">Editar</button>
-          <button class="small-btn" onclick="remover(${task.id})">Excluir</button>
+          <button class="done" onclick="concluir(${task.id})">✔</button>
+          <button class="edit" onclick="editar(${task.id})">✏️</button>
+          <button class="delete" onclick="remover(${task.id})">❌</button>
         </div>
       `;
 
@@ -196,36 +204,44 @@ function render() {
   initDrag();
 }
 
+function concluir(id) {
+  const data = getData();
+  Object.values(data).forEach(lista => {
+    lista.forEach(t => {
+      if (t.id === id) t.status = "Concluído";
+    });
+  });
+  salvar(data);
+  render();
+}
+
 function editar(id) {
   const data = getData();
-
-  for (let dia of dias) {
-    const task = data[dia].find(t => t.id === id);
-    if (task) {
-      task.titulo = prompt("Novo título:", task.titulo);
-      task.responsavel = prompt("Responsável:", task.responsavel);
-      task.prazo = prompt("Prazo:", task.prazo);
-    }
-  }
-
-  localStorage.setItem("kanban", JSON.stringify(data));
+  Object.values(data).forEach(lista => {
+    lista.forEach(t => {
+      if (t.id === id) {
+        t.titulo = prompt("Título:", t.titulo);
+        t.responsavel = prompt("Responsável:", t.responsavel);
+        t.prazo = prompt("Prazo:", t.prazo);
+      }
+    });
+  });
+  salvar(data);
   render();
 }
 
 function remover(id) {
   let data = getData();
-
-  dias.forEach(dia => {
-    data[dia] = data[dia].filter(t => t.id !== id);
+  Object.keys(data).forEach(k => {
+    data[k] = data[k].filter(t => t.id !== id);
   });
-
-  localStorage.setItem("kanban", JSON.stringify(data));
+  salvar(data);
   render();
 }
 
 function initDrag() {
-  dias.forEach(dia => {
-    new Sortable(document.getElementById(dia), {
+  Object.keys(getData()).forEach(coluna => {
+    new Sortable(document.getElementById(coluna), {
       group: "tasks",
       animation: 150,
       onEnd: salvarOrdem
@@ -235,22 +251,20 @@ function initDrag() {
 
 function salvarOrdem() {
   let novo = {};
+  Object.keys(getData()).forEach(coluna => {
+    const el = document.getElementById(coluna);
+    novo[coluna] = [];
 
-  dias.forEach(dia => {
-    const col = document.getElementById(dia);
-    novo[dia] = [];
-
-    [...col.children].forEach(card => {
+    [...el.children].forEach(card => {
       const id = Number(card.dataset.id);
-
-      dias.forEach(d => {
-        const original = getData()[d].find(t => t.id === id);
-        if (original) novo[dia].push(original);
+      Object.values(getData()).forEach(lista => {
+        const found = lista.find(t => t.id === id);
+        if (found) novo[coluna].push(found);
       });
     });
   });
 
-  localStorage.setItem("kanban", JSON.stringify(novo));
+  salvar(novo);
 }
 
 criarBoard();
